@@ -8,8 +8,9 @@ secrets, and pre-commit hooks for everything that should never reach git.
 [gist]: https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 
 > **Status:** v0.1 (Foundation & Safety). The synthesis pipeline (LLM ingest)
-> lands in v0.2 — see [CHANGELOG.md](CHANGELOG.md) and the v0.1 GitHub
-> milestone for the active scope.
+> lands in v0.2 — see [docs/roadmap.md](docs/roadmap.md) for the full
+> v0.2–v0.5 plan, [CHANGELOG.md](CHANGELOG.md) for what shipped, and the
+> v0.1 GitHub milestone for active scope.
 
 ## What it does
 
