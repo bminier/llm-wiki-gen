@@ -1,0 +1,21 @@
+# Extend the default gitleaks ruleset with project-specific rules.
+# https://github.com/gitleaks/gitleaks
+[extend]
+useDefault = true
+
+[[rules]]
+id = "llm-wiki-token"
+description = "llm-wiki-gen project token (LLM_WIKI_*)"
+regex = '''(?i)LLM_WIKI_[A-Z0-9_]+\s*=\s*["']?([A-Za-z0-9_\-]{16,})["']?'''
+secretGroup = 1
+keywords = ["LLM_WIKI_"]
+
+[allowlist]
+description = "Allowlist for known-safe matches"
+paths = [
+  '''tests/fixtures/pii-samples/.*''',
+  '''tests/fixtures/sources/.*''',
+  '''docs/karpathy.*\.md''',
+]
+# Pre-commit handles staged scans; CI handles full-history scans. Identical
+# config keeps both stages consistent.

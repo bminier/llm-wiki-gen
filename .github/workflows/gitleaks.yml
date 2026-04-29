@@ -1,0 +1,24 @@
+name: gitleaks
+
+on:
+  push:
+    branches: [dev, "release/*", "prerelease/*"]
+  pull_request:
+    branches: [dev, "release/*", "prerelease/*"]
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC — weekly full-history sweep
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml

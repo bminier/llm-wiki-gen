@@ -1,0 +1,47 @@
+# Bun / Node
+node_modules/
+# bun.lock IS committed for reproducible installs.
+# bun.lockb (legacy binary lockfile) is not.
+bun.lockb
+.npm/
+.pnp.*
+.yarn/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
+.llm-wiki.local.toml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS
+desktop.ini
+
+# Tool state (XDG dirs are outside the repo, but allow local override)
+.cache/
+.local-ledger/
+
+# Pre-commit
+.pre-commit-cache/
+
+# Logs
+*.log
+
+# Plan / scratch
+.scratch/

@@ -1,0 +1,6 @@
+This file contains no PII. It exists to verify the scanner does not produce
+false positives on ordinary prose.
+
+The agentic-DevOps pattern uses LLM harnesses to coordinate CI/CD pipelines.
+Numbers in prose: there are 365 days in a year and pi is roughly 3.14159.
+A timestamp like 2026-04-29 should not match a routing number rule.

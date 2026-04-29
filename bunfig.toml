@@ -1,0 +1,8 @@
+[install]
+# Match package-lock-style determinism in CI
+exact = false
+production = false
+
+[test]
+coverage = false
+preload = ["./tests/setup.ts"]

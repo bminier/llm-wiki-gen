@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a new capability or enhancement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user-facing pain does this solve? Be concrete.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What would the change look like? CLI flags, config keys, MCP tools.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Target milestone (if known)
+      options:
+        - v0.2 — LLM Ingest
+        - v0.3 — Synthesis
+        - v0.4 — Query
+        - v0.5 — Polish
+        - Unsure

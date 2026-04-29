@@ -1,0 +1,22 @@
+Synthetic test data — never real. Do not commit real PII to this file.
+
+# DENY tier samples
+SSN: 123-45-6789
+Card: 4111 1111 1111 1111
+Routing: 111000025
+IBAN: GB82WEST12345698765432
+AWS Key: AKIAIOSFODNN7EXAMPLE
+SSH:
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAA
+-----END OPENSSH PRIVATE KEY-----
+
+Mnemonic: abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+
+# WARN tier samples (personal context)
+Personal email: alice@gmail.com
+Cell phone: (555) 123-4567
+
+# Should be ALLOW (business context)
+For sales inquiries: sales@example.com
+Office line: 1-800-555-0199

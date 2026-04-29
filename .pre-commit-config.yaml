@@ -1,0 +1,49 @@
+# Pre-commit hooks for llm-wiki-gen.
+# Install with: python scripts/install-hooks.py
+# Run manually:  pre-commit run --all-files
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: '^docs/karpathy_.*\.md$'
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: local
+    hooks:
+      - id: bun-typecheck
+        name: bun typecheck
+        entry: bun run typecheck
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx)$
+
+      - id: bun-test
+        name: bun test
+        entry: bun test
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx)$
+
+      - id: biome-check
+        name: biome check
+        entry: bun run lint
+        language: system
+        pass_filenames: false
+        files: \.(ts|tsx|js|jsx|json)$
+
+      - id: pii-deny-scan
+        name: PII regex scan (DENY tier, staged files)
+        entry: bun run scripts/pii-precommit.ts
+        language: system
+        files: \.(md|markdown|txt|html|htm|csv)$
