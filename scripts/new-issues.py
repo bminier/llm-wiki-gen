@@ -28,6 +28,7 @@ MILESTONES = [
     {"title": "v0.3 — Synthesis", "description": "Topic page agent, contradiction detection, index.md auto-maintenance."},
     {"title": "v0.4 — Query", "description": "`query` command + MCP `query` tool."},
     {"title": "v0.5 — Polish", "description": "watch mode, perf, cookbook docs, MCP client compatibility."},
+    {"title": "v0.6 — Source types beyond files", "description": "Non-file source types: chat transcripts, GitHub issues. Reframes the source allowlist from 'a folder of files' to 'a list of typed source streams'."},
 ]
 
 V01_ISSUES: list[dict] = [
@@ -64,6 +65,7 @@ V02_ISSUES: list[dict] = [
     {"title": "Slug + filename strategy", "body": "Stable, collision-free slugs from arbitrary source paths. Frontmatter must round-trip after rename. Document the algorithm in docs/architecture.md.", "labels": ["feat", "v0.2"]},
     {"title": "pii-llm integration tests", "body": "Use a tiny local model in CI (or skip on no-Ollama with a clear message). Cover: personal email correctly promoted, business email correctly demoted, ambiguous case stays at warn.", "labels": ["test", "security", "v0.2"]},
     {"title": "Ingest cost accounting", "body": "Per-run token count + wall time written to runs.summary_json. Surface via `status` MCP tool.", "labels": ["feat", "v0.2"]},
+    {"title": "PII WARN-tier literal-keyword scanner", "body": "Extend src/scanners/rules/warn.ts with a literal-keyword sublist that flags occurrences of `routing number`, `recovery code`, `account number`, `api_key`, `password`, `secret`, `private key` adjacent to suspicious-looking values. Pre-LLM-classifier nudge so the v0.2 pii-llm has more candidate WARN hits to refine. Per the karpathy-doc pre-ingestion checklist.", "labels": ["feat", "security", "v0.2"]},
     {"title": "Automated tests for v0.2 ingest pipeline", "body": "Unit + integration coverage for: Ollama client (mocked + skip-if-no-Ollama live), PDF/DOCX extractors (golden bytes), source-note generator (idempotency), `ingest` end-to-end, `log.md` round-trip, MCP `ingest` tool, slug strategy, cost accounting. Excludes pii-llm (own issue).", "labels": ["test", "v0.2"]},
     {"title": "Update docs for v0.2", "body": "README LLM-ingest section, CHANGELOG, docs/architecture.md (extractor pipeline + slug algorithm + log.md format), docs/pii-tiers.md (LLM promotion/demotion rules).", "labels": ["docs", "v0.2"]},
     {"title": "v0.2 release notes + tag", "body": "Cut release/v0.2 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.2"]},
@@ -77,6 +79,10 @@ V03_ISSUES: list[dict] = [
     {"title": "Wikilink graph health in lint", "body": "Add metrics: average inbound links, isolated clusters, deepest path. Print as a table in human mode; JSON in --json mode.", "labels": ["feat", "v0.3"]},
     {"title": "Synthesis test fixtures", "body": "Tiny vault + tiny source set that exercises the full ingest→synthesize loop. Used by both unit tests and the v0.3 smoke test.", "labels": ["test", "v0.3"]},
     {"title": "Query-aware lint", "body": "When `lint` finds a topic referenced by a wikilink that has no corresponding topics/<name>.md, suggest creating it (printed only, doesn't fail).", "labels": ["feat", "v0.3"]},
+    {"title": "Extended agent signal taxonomy", "body": "The Karpathy doc lists ten signals an LLM-driven wiki should emit beyond raw summarisation: new idea, changed opinion, duplicate concept, contradiction, stale source, related project, action item, business opportunity, claim needing verification, implementation candidate. Contradiction is already its own issue. Add the remaining nine as detection rules in src/synthesis/. Each emits an entry under claims/<signal>/<id>.md with provenance back to the source-note(s) that triggered it. Document the taxonomy in docs/architecture.md.", "labels": ["feat", "v0.3"]},
+    {"title": "review CLI verb", "body": "src/commands/review.ts. Surfaces pending wiki-vault changes (new source-notes, updated topic pages, agent-emitted signals) for human approval before they're committed to the vault git repo. The karpathy-doc pipeline is `update-topic → review → commit`; this is the human-in-the-loop step between synthesis and persistence. Diff renderer + accept/reject/defer flow per change.", "labels": ["feat", "v0.3"]},
+    {"title": "commit CLI verb", "body": "src/commands/commit.ts. Wraps `git -C <wiki-path> commit` with structured commit messages tied to ingest/synthesis run-ids. Pairs with `review`: only changes the human accepted via `review` are committed. v0.1 leaves the vault uncommitted; this verb closes the loop.", "labels": ["feat", "v0.3"]},
+    {"title": "Default wiki folder taxonomy", "body": "The Karpathy doc names a richer folder taxonomy than v0.1's `topics/`/`source-notes/`/`questions/`. Extend `init` and the synthesis layer to scaffold and recognise: `people/`, `companies/`, `timelines/`, `concepts/`, `claims/`, plus root-level `architecture-decisions.md`, `open-questions.md`, `claims-needing-verification.md`. Per-folder frontmatter schemas in src/obsidian/frontmatter.ts. Index.md exemption preserved per existing convention.", "labels": ["feat", "v0.3"]},
     {"title": "Automated tests for v0.3 synthesis", "body": "Use the synthesis fixtures to drive: topic-page agent (round-trip through <!-- agent:start/end -->), contradiction detector (golden divergence cases), index.md auto-maintenance, wikilink-graph metrics, query-aware lint suggestions.", "labels": ["test", "v0.3"]},
     {"title": "Update docs for v0.3", "body": "README synthesis section, CHANGELOG, docs/architecture.md (topic-agent contract, section-marker convention, contradiction format).", "labels": ["docs", "v0.3"]},
     {"title": "v0.3 release notes + tag", "body": "Cut release/v0.3 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.3"]},
@@ -109,6 +115,15 @@ V05_ISSUES: list[dict] = [
     {"title": "v0.5 release notes + tag", "body": "Cut release/v0.5 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.5"]},
 ]
 
+V06_ISSUES: list[dict] = [
+    {"title": "Source-id provenance scheme (file/onedrive/github/chat)", "body": "v0.2 ledger keys on absolute path + content hash. v0.6 needs a stable `source_id` that survives the ingestion path moving: `file:<absolute-path>` (default), `onedrive:<rel-path>`, `github:<owner>/<repo>/issues/<n>`, `chat:<provider>/<conversation-id>`. Add a `source_scheme` column (or extend `source_id` itself); existing rows migrate to `file:`. Document the scheme in docs/architecture.md.", "labels": ["feat", "v0.6"]},
+    {"title": "GitHub-issue ingestion as a source type", "body": "Extend the source allowlist from 'folders of files' to typed source streams. Each GitHub issue becomes a synthetic source, hashed by body + comment thread, ingested through the same source-note pipeline as files. Canonical path: `github:<owner>/<repo>/issues/<n>`. Mocked-API tests; live tests skip without GH_TOKEN. Pre-req: source-id provenance scheme.", "labels": ["feat", "v0.6"]},
+    {"title": "Chat-transcript ingestion as a source type", "body": "Per the karpathy doc, chat transcripts (Claude Code, ChatGPT exports, etc.) are first-class sources alongside files and issues. Canonical path: `chat:<provider>/<conversation-id>`. Transcript-specific extractor preserves turn boundaries and roles. Pre-req: source-id provenance scheme.", "labels": ["feat", "v0.6"]},
+    {"title": "Automated tests for v0.6 source types", "body": "Unit + integration coverage for: source-id round-trip after a path change, GitHub-issue ingestion (mocked API + idempotent re-runs), chat-transcript extractor (turn boundaries preserved). Live API tests skip-if-no-token.", "labels": ["test", "v0.6"]},
+    {"title": "Update docs for v0.6", "body": "README source-types section, CHANGELOG, docs/architecture.md (typed sources + source-id provenance scheme). Cookbook entries for ingesting GitHub Issues and chat exports.", "labels": ["docs", "v0.6"]},
+    {"title": "v0.6 release notes + tag", "body": "Cut release/v0.6 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.6"]},
+]
+
 
 ISSUE_SETS: dict[str, tuple[str, list[dict]]] = {
     "v0.1": ("v0.1 — Foundation & Safety", V01_ISSUES),
@@ -116,6 +131,7 @@ ISSUE_SETS: dict[str, tuple[str, list[dict]]] = {
     "v0.3": ("v0.3 — Synthesis", V03_ISSUES),
     "v0.4": ("v0.4 — Query", V04_ISSUES),
     "v0.5": ("v0.5 — Polish", V05_ISSUES),
+    "v0.6": ("v0.6 — Source types beyond files", V06_ISSUES),
 }
 
 
