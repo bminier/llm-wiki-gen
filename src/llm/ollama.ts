@@ -59,6 +59,14 @@ function assertLoopbackUrl(urlStr: string): void {
   } catch {
     throw new LlmConfigError(`Ollama baseUrl is not a valid URL: ${urlStr}`);
   }
+  // zod `.url()` accepts ws:/ftp:/file:/etc. — only HTTP fetches are
+  // meaningful here; reject other schemes up front for an actionable error
+  // instead of a confusing fetch failure later.
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new LlmConfigError(
+      `Ollama baseUrl scheme must be http: or https:; got "${url.protocol}".`,
+    );
+  }
   // URL.hostname keeps IPv6 brackets in some runtimes and strips them in
   // others. Normalize so isIP() sees the bare address.
   const host = url.hostname.replace(/^\[/, "").replace(/]$/, "");
