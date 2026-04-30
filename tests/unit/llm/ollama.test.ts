@@ -104,6 +104,23 @@ describe("OllamaProvider constructor", () => {
     ).toThrow(LlmConfigError);
   });
 
+  test("rejects non-http(s) schemes (ws/ftp/file/etc.)", () => {
+    // zod's .url() validator accepts any scheme; we only want fetch-able
+    // schemes so a typo fails at construction with an actionable message.
+    for (const url of ["ws://localhost:11434", "ftp://127.0.0.1:11434", "file:///tmp/socket"]) {
+      expect(() => new OllamaProvider({ baseUrl: url, model: "x", fetch: noopFetch })).toThrow(
+        LlmConfigError,
+      );
+    }
+  });
+
+  test("accepts https://localhost (TLS proxy in front of Ollama)", () => {
+    expect(
+      () =>
+        new OllamaProvider({ baseUrl: "https://localhost:11434", model: "x", fetch: noopFetch }),
+    ).not.toThrow();
+  });
+
   test("rejects numeric-but-invalid 127.* hostnames (e.g. 127.999.0.1)", () => {
     // The previous regex check accepted any "127.\d{1,3}.\d{1,3}.\d{1,3}",
     // which would let "127.999.0.1" through despite not being a valid IPv4
