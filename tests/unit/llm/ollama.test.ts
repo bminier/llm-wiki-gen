@@ -131,6 +131,69 @@ describe("OllamaProvider constructor", () => {
     ).toThrow(LlmConfigError);
   });
 
+  test("rejects non-positive timeoutMs", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          timeoutMs: 0,
+        }),
+    ).toThrow(LlmConfigError);
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          timeoutMs: -100,
+        }),
+    ).toThrow(LlmConfigError);
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          timeoutMs: 1.5,
+        }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("rejects negative maxRetries", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          maxRetries: -1,
+        }),
+    ).toThrow(LlmConfigError);
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          maxRetries: 1.5,
+        }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("accepts maxRetries: 0 (no retries, single attempt only)", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+          maxRetries: 0,
+        }),
+    ).not.toThrow();
+  });
+
   test("rejects baseUrl with a query or fragment", () => {
     expect(
       () =>

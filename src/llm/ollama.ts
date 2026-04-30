@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { LlmConfigError } from "./index.ts";
+import { LlmConfigError } from "./errors.ts";
 import type {
   GenerateChunk,
   GenerateRequest,
@@ -89,11 +89,23 @@ export class OllamaProvider implements LlmProvider {
 
   constructor(opts: OllamaOptions) {
     assertLoopbackUrl(opts.baseUrl);
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+      throw new LlmConfigError(
+        `Ollama provider timeoutMs must be a positive integer; got ${timeoutMs}`,
+      );
+    }
+    const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+      throw new LlmConfigError(
+        `Ollama provider maxRetries must be a non-negative integer; got ${maxRetries}`,
+      );
+    }
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
     this.defaultModel = opts.model;
     this.fetchFn = opts.fetch ?? fetch;
-    this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.timeoutMs = timeoutMs;
+    this.maxRetries = maxRetries;
   }
 
   async health(): Promise<LlmHealth> {
