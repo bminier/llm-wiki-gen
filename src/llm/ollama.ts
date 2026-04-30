@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { LlmConfigError } from "./index.ts";
 import type {
   GenerateChunk,
@@ -42,10 +43,14 @@ interface OllamaGenerateResponse {
 }
 
 /**
- * Loopback hostnames the OllamaProvider will accept. The README/SECURITY
+ * Loopback origins the OllamaProvider will accept. The README/SECURITY
  * promise is "no outbound network calls"; enforce that in code so a typo
  * or malicious config can't quietly turn the LLM client into an exfil
  * channel. Allowing a remote endpoint requires a code change here.
+ *
+ * Validates: hostname is a real loopback (uses node:net `isIP` so
+ * "127.999.0.1" is rejected as invalid IPv4), and the URL is bare-origin
+ * (no path/query/fragment, since later code joins "/api/...").
  */
 function assertLoopbackUrl(urlStr: string): void {
   let url: URL;
@@ -54,14 +59,23 @@ function assertLoopbackUrl(urlStr: string): void {
   } catch {
     throw new LlmConfigError(`Ollama baseUrl is not a valid URL: ${urlStr}`);
   }
-  // URL.hostname strips IPv6 brackets in some runtimes and keeps them in
-  // others. Normalize before matching.
+  // URL.hostname keeps IPv6 brackets in some runtimes and strips them in
+  // others. Normalize so isIP() sees the bare address.
   const host = url.hostname.replace(/^\[/, "").replace(/]$/, "");
-  const ok =
-    host === "localhost" || host === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
-  if (!ok) {
+  const ipv = isIP(host);
+  const isLoopback =
+    host === "localhost" || (ipv === 4 && host.startsWith("127.")) || (ipv === 6 && host === "::1");
+  if (!isLoopback) {
     throw new LlmConfigError(
       `Ollama baseUrl must be loopback (localhost, 127.0.0.0/8, ::1); got "${url.hostname}". Remote LLM endpoints require an explicit code change — see SECURITY.md.`,
+    );
+  }
+  // Reject non-origin URLs: "/api/..." is appended downstream, so a path
+  // like "/foo" would silently produce ".../foo/api/tags" (broken request,
+  // confusing error). Force the user to supply just the origin.
+  if ((url.pathname !== "" && url.pathname !== "/") || url.search || url.hash) {
+    throw new LlmConfigError(
+      `Ollama baseUrl must be a bare origin (no path/query/fragment); got "${urlStr}".`,
     );
   }
 }
@@ -193,15 +207,25 @@ export class OllamaProvider implements LlmProvider {
         return result;
       } catch (err) {
         clearTimeout(timer);
-        // 4xx is terminal — don't retry, surface immediately.
-        if (err instanceof OllamaError && err.status !== undefined && err.status < 500) {
+        // Narrow retry policy to *transient* failures only:
+        //   - abort/timeout (wrap with context)
+        //   - server error (OllamaError with status ≥ 500)
+        //   - network failure (fetch throws TypeError)
+        // Anything else — JSON parse errors, ReferenceError, malformed-NDJSON
+        // OllamaError, 4xx — is non-transient. Surface immediately so
+        // permanent bugs don't burn retry budget on the way to the same
+        // failure.
+        if (isAbortLikeError(err)) {
+          lastErr = new OllamaError(
+            `Ollama request to ${url} timed out after ${this.timeoutMs}ms (attempt ${i + 1}/${this.maxRetries + 1})`,
+          );
+        } else if (err instanceof OllamaError && err.status !== undefined && err.status >= 500) {
+          lastErr = err;
+        } else if (err instanceof TypeError) {
+          lastErr = err;
+        } else {
           throw err;
         }
-        lastErr = isAbortLikeError(err)
-          ? new OllamaError(
-              `Ollama request to ${url} timed out after ${this.timeoutMs}ms (attempt ${i + 1}/${this.maxRetries + 1})`,
-            )
-          : err;
       }
       if (i < this.maxRetries) {
         const backoff = Math.min(deadline - Date.now() - 1, RETRY_BASE_MS * 2 ** i);
