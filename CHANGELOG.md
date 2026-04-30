@@ -31,7 +31,7 @@ will be `v1.0.0`.
 - gitleaks wrapper (`src/scanners/secrets.ts`) and `.gitleaks.toml` with a
   custom `LLM_WIKI_*` token rule.
 - `sync` command: end-to-end pipeline with `--json`, `--explain-dups`,
-  hash-redacted scan log, and quarantine-on-DENY behaviour.
+  hash-redacted scan log, and quarantine-on-DENY behavior.
 - `lint` command: per-folder zod frontmatter schemas, wikilink resolution
   with orphan detection, and Dataview block sanity check.
 - `init` command: scaffolds an Obsidian-ready vault that lints clean.
