@@ -5,6 +5,12 @@ of [Karpathy's LLM Wiki pattern][gist] with strong safety rails: a read-only
 source allowlist, tiered PII scanning (DENY / WARN / ALLOW), gitleaks for
 secrets, and pre-commit hooks for everything that should never reach git.
 
+**Local-first means local-only.** The LLM provider is constrained to
+[Ollama](https://ollama.com) running on `localhost`, or `none` (off). There
+is no remote-API integration, no telemetry, and no opt-in network call
+outside `localhost:11434`. Adding a remote provider requires a code change
+plus an explicit confirmation per [SECURITY.md](SECURITY.md).
+
 [gist]: https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 
 > **Status:** v0.1 (Foundation & Safety) shipped. The synthesis pipeline (LLM
@@ -33,16 +39,22 @@ secrets, and pre-commit hooks for everything that should never reach git.
 - **`init`** scaffolds an empty Obsidian vault that lints clean from day one.
 - **`mcp`** starts a stdio MCP server exposing `sync`, `lint`, `status`, and
   `ingest` — useful with Claude Code, Claude Desktop, or any MCP client.
-- **`ingest`** is a stub in v0.1; the LLM pipeline (Ollama-only, local) lands
-  in v0.2.
+- **`ingest`** is a stub in v0.1; the LLM pipeline lands in v0.2 and runs
+  exclusively against an Ollama daemon on `localhost`. No outbound network
+  calls; the model weights live on your disk.
 
 ## Quickstart
 
 ```bash
 # 0) Prereqs
-#    - Bun 1.3+  https://bun.sh
-#    - Ollama (only needed for v0.2+)  https://ollama.com
-#    - gitleaks (recommended, for ad-hoc secret scans)  https://github.com/gitleaks/gitleaks
+#    - Bun 1.3+                                          https://bun.sh
+#    - Ollama (only needed for v0.2+; runs locally)      https://ollama.com
+#    - gitleaks (recommended, for ad-hoc secret scans)   https://github.com/gitleaks/gitleaks
+#
+#    Ollama setup, when you reach v0.2:
+#       curl -fsSL https://ollama.com/install.sh | sh    # or download installer
+#       ollama pull llama3.1:8b                          # ~4.7 GB; one-time
+#       ollama serve                                     # listens on localhost:11434
 
 # 1) Clone and install
 git clone <this repo> && cd llm-wiki-gen
@@ -85,7 +97,11 @@ business_email_domains   = ["mycompany.com"]
 business_phone_allowlist = ["+1-800-555-0199"]
 
 [llm]
+# provider is restricted by zod to "ollama" or "none". A remote-API provider
+# would require a code change plus an explicit confirmation step.
 provider = "ollama"
+# base_url is intentionally local-only — anything that isn't a localhost
+# address will be flagged by SECURITY.md review before reaching main.
 base_url = "http://localhost:11434"
 model    = "llama3.1:8b"
 ```

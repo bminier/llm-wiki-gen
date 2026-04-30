@@ -168,34 +168,42 @@ async function* parseNdjsonStream(body: ReadableStream<Uint8Array>): AsyncIterab
     while (true) {
       const { value, done } = await reader.read();
       if (done) {
+        // Flush any pending bytes the decoder is holding (incomplete
+        // multi-byte sequence at the tail). Without this, a non-ASCII
+        // character split across chunks could be lost.
+        buffer += decoder.decode();
         const trailing = buffer.trim();
-        if (trailing) {
-          const parsed = tryParseChunk(trailing);
-          if (parsed) yield parsed;
-        }
+        if (trailing) yield parseChunk(trailing);
         return;
       }
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
       for (const line of lines) {
-        const parsed = tryParseChunk(line);
-        if (parsed) yield parsed;
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        yield parseChunk(trimmed);
       }
     }
   } finally {
-    reader.releaseLock();
+    // Signal to the underlying body that we don't want any more bytes —
+    // important when the consumer breaks out of the for-await early so the
+    // HTTP connection closes promptly. cancel() releases the reader lock
+    // implicitly. Swallow rejection: the stream may already be done.
+    reader.cancel().catch(() => {});
   }
 }
 
-function tryParseChunk(line: string): GenerateChunk | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
+function parseChunk(line: string): GenerateChunk {
   let parsed: OllamaGenerateResponse;
   try {
-    parsed = JSON.parse(trimmed) as OllamaGenerateResponse;
-  } catch {
-    return null;
+    parsed = JSON.parse(line) as OllamaGenerateResponse;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Non-empty unparseable line is a protocol violation — surface it
+    // instead of silently dropping (which would manifest as missing tokens
+    // or a missing `final` chunk and look like a model bug).
+    throw new OllamaError(`Failed to parse Ollama NDJSON chunk: ${msg}`);
   }
   const text = parsed.response ?? "";
   const done = Boolean(parsed.done);

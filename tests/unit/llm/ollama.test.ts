@@ -234,6 +234,45 @@ describe("OllamaProvider.generateStream", () => {
     expect(chunks[0]?.final?.responseTokens).toBe(1);
   });
 
+  test("throws OllamaError on a malformed NDJSON line", async () => {
+    const provider = makeProvider({
+      fetch: mockFetch(() => new Response("this is not json\n", { status: 200 })),
+    });
+    const drain = async () => {
+      for await (const _ of provider.generateStream({ prompt: "x" })) {
+        // drain
+      }
+    };
+    await expect(drain()).rejects.toBeInstanceOf(OllamaError);
+  });
+
+  test("flushes the UTF-8 decoder on stream end (multi-byte split across chunks)", async () => {
+    // Encode a final NDJSON line whose response contains a 3-byte UTF-8
+    // character (€), then split the bytes so the multi-byte char straddles
+    // two chunks. Without decoder flush on `done`, the trailing bytes
+    // would be lost and the JSON would fail to parse.
+    const fullJson = `${JSON.stringify({ model: "x", response: "€", done: true })}\n`;
+    const fullBytes = new TextEncoder().encode(fullJson);
+    // The € sign is at the byte position right after `"response":"`. Split
+    // mid-multi-byte regardless of where exactly that is — find the first
+    // 0xE2 byte (€'s leading byte) and split right after it.
+    const splitAt = fullBytes.indexOf(0xe2) + 1;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(fullBytes.slice(0, splitAt));
+        c.enqueue(fullBytes.slice(splitAt));
+        c.close();
+      },
+    });
+    const provider = makeProvider({
+      fetch: mockFetch(() => new Response(stream, { status: 200 })),
+    });
+    const chunks = [];
+    for await (const c of provider.generateStream({ prompt: "x" })) chunks.push(c);
+    expect(chunks.length).toBe(1);
+    expect(chunks[0]?.text).toBe("€");
+  });
+
   test("sends stream:true in request body", async () => {
     let seenBody: Record<string, unknown> = {};
     const provider = makeProvider({
