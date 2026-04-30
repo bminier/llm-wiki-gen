@@ -47,3 +47,15 @@ repos:
         entry: bun run scripts/pii-precommit.ts
         language: system
         files: \.(md|markdown|txt|html|htm|csv)$
+        # Allowlist for files that legitimately contain DENY-tier patterns:
+        # synthetic fixtures, the rule docs that describe the patterns, and
+        # the conversation backup that captured them as part of the design.
+        # Mirrors the gitleaks allowlist in .gitleaks.toml.
+        exclude: |
+          (?x)^(
+            tests/fixtures/pii-samples/.*|
+            tests/fixtures/sources/.*|
+            docs/karpathy_.*\.md|
+            docs/pii-tiers\.md|
+            CLAUDE\.md
+          )$
