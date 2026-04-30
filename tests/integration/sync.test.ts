@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runSync } from "../../src/commands/sync.ts";
 import type { ResolvedConfig } from "../../src/core/config.ts";
 
+// realpathSync: see note in tests/unit/walker.test.ts. The Allowlist resolves
+// symlinks (macOS /var/folders → /private/var/folders); resolve up front so
+// test path comparisons match what runSync emits.
 function tmp(prefix: string): string {
-  return mkdtempSync(join(tmpdir(), `llmwiki-sync-${prefix}-`));
+  return realpathSync(mkdtempSync(join(tmpdir(), `llmwiki-sync-${prefix}-`)));
 }
 
 function buildConfig(sourceDir: string): ResolvedConfig {

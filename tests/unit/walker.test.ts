@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Allowlist } from "../../src/core/allowlist.ts";
 import { globMatches, walk } from "../../src/core/walker.ts";
 
+// realpathSync: macOS symlinks /var/folders → /private/var/folders, but the
+// Allowlist resolves symlinks, so the walker emits the /private/... form.
+// Resolve up front so test path comparisons match what walk() returns.
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), "llmwiki-walk-"));
+  return realpathSync(mkdtempSync(join(tmpdir(), "llmwiki-walk-")));
 }
 
 describe("globMatches", () => {
