@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Seed the v0.1 GitHub milestone and its issues via `gh`.
+"""Seed GitHub milestones and issues for llm-wiki-gen via `gh`.
 
 Usage:
     python scripts/new-issues.py <owner/repo>
+    python scripts/new-issues.py <owner/repo> --milestone v0.2
+    python scripts/new-issues.py <owner/repo> --milestone all
 
-Idempotent-ish: skips milestones/issues whose titles already exist.
+Idempotent: skips milestones/issues whose titles already exist.
+
+Issue bodies mirror the per-milestone tables in docs/roadmap.md. Update
+the roadmap first, then update the corresponding V0X_ISSUES block here.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -24,7 +30,7 @@ MILESTONES = [
     {"title": "v0.2 — LLM Ingest (Ollama)", "description": "Source-note generator + LLM-tiered PII contextual classifier + pdf/docx extractors."},
     {"title": "v0.3 — Synthesis", "description": "Topic page agent, contradiction detection, index.md auto-maintenance."},
     {"title": "v0.4 — Query", "description": "`query` command + MCP `query` tool."},
-    {"title": "v0.5 — Polish", "description": "watch mode, perf, cookbook docs."},
+    {"title": "v0.5 — Polish", "description": "watch mode, perf, cookbook docs, MCP client compatibility."},
 ]
 
 V01_ISSUES: list[dict] = [
@@ -49,9 +55,75 @@ V01_ISSUES: list[dict] = [
     {"title": "v0.1 release notes + tag from release/v0.1", "body": "Cut release/v0.1 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.1"]},
 ]
 
+V02_ISSUES: list[dict] = [
+    {"title": "Ollama HTTP client + retry/timeout", "body": "src/llm/ollama.ts. Streamed response handling, exponential backoff, healthcheck on /api/tags. Provider abstraction so v0.5 can plug llama.cpp without rewriting callers.", "labels": ["feat", "v0.2"]},
+    {"title": "PII contextual classifier (LLM)", "body": "src/scanners/pii-llm.ts. Takes regex WARN-tier hits + ±200-char window, asks Ollama 'is this personal or business context?' with a strict JSON schema response. Can promote WARN→DENY or demote WARN→ALLOW. Runs after pii-regex in `sync`.", "labels": ["feat", "security", "v0.2"]},
+    {"title": "PDF extractor", "body": "src/core/extractors/pdf.ts. Vendored pdf-parse or pdfjs. Hashes the source bytes, not the extracted text. Update extract/isSupported/contentTypeFor. Add fixture under tests/fixtures/.", "labels": ["feat", "v0.2"]},
+    {"title": "DOCX extractor", "body": "src/core/extractors/docx.ts. Likely `mammoth`. Same shape as the PDF extractor. Add fixture under tests/fixtures/.", "labels": ["feat", "v0.2"]},
+    {"title": "Source-note generator", "body": "Given an extracted source, emit source-notes/<slug>.md with proper frontmatter (source_id, hash, ingested, type, tags), summary, claims, entities, links. Idempotent: re-running over an unchanged source is a no-op.", "labels": ["feat", "v0.2"]},
+    {"title": "ingest command — real implementation", "body": "Replace the v0.1 stub. Reads ledger for new/changed sources, calls extractor + classifier + generator, writes notes, updates ledger status to `unchanged`. Flags: --since <run-id>, --limit N, --source <id>.", "labels": ["feat", "v0.2"]},
+    {"title": "Append-only log.md writer", "body": "Per the gist spec: each ingest/query run appends a dated entry to log.md. Parse-resistant: write through a single helper so format stays stable.", "labels": ["feat", "v0.2"]},
+    {"title": "MCP ingest tool — non-stub", "body": "Update src/mcp/server.ts to dispatch to the real ingest pipeline. Stream progress over MCP if practical; otherwise return summary.", "labels": ["feat", "v0.2"]},
+    {"title": "Slug + filename strategy", "body": "Stable, collision-free slugs from arbitrary source paths. Frontmatter must round-trip after rename. Document the algorithm in docs/architecture.md.", "labels": ["feat", "v0.2"]},
+    {"title": "pii-llm integration tests", "body": "Use a tiny local model in CI (or skip on no-Ollama with a clear message). Cover: personal email correctly promoted, business email correctly demoted, ambiguous case stays at warn.", "labels": ["test", "security", "v0.2"]},
+    {"title": "Ingest cost accounting", "body": "Per-run token count + wall time written to runs.summary_json. Surface via `status` MCP tool.", "labels": ["feat", "v0.2"]},
+    {"title": "v0.2 release notes + tag", "body": "Cut release/v0.2 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.2"]},
+]
+
+V03_ISSUES: list[dict] = [
+    {"title": "Topic page agent", "body": "src/synthesis/topics.ts. Given new/changed source-notes, pick affected topics and update topics/<name>.md. Preserves human edits between agent-managed sections.", "labels": ["feat", "v0.3"]},
+    {"title": "Section markers (agent:start/agent:end)", "body": "Convention for 'agent owns this region; human owns the rest' using <!-- agent:start ... --> / <!-- agent:end --> comments. Document in docs/architecture.md.", "labels": ["feat", "v0.3"]},
+    {"title": "Contradiction detector", "body": "Compare new source-note claims against existing topic claims. Emit claims/contradictions/<id>.md when divergence is detected.", "labels": ["feat", "v0.3"]},
+    {"title": "index.md auto-maintenance", "body": "Keep the root index in sync with the actual folder structure. Don't fight Obsidian's preferred Dataview pattern.", "labels": ["feat", "v0.3"]},
+    {"title": "Wikilink graph health in lint", "body": "Add metrics: average inbound links, isolated clusters, deepest path. Print as a table in human mode; JSON in --json mode.", "labels": ["feat", "v0.3"]},
+    {"title": "Synthesis test fixtures", "body": "Tiny vault + tiny source set that exercises the full ingest→synthesize loop. Used by both unit tests and the v0.3 smoke test.", "labels": ["test", "v0.3"]},
+    {"title": "Query-aware lint", "body": "When `lint` finds a topic referenced by a wikilink that has no corresponding topics/<name>.md, suggest creating it (printed only, doesn't fail).", "labels": ["feat", "v0.3"]},
+    {"title": "v0.3 release notes + tag", "body": "Cut release/v0.3 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.3"]},
+]
+
+V04_ISSUES: list[dict] = [
+    {"title": "query CLI command", "body": "src/commands/query.ts. Takes a free-form question, retrieves relevant pages (BM25 over titles + frontmatter; v0.5 may add embeddings), synthesizes an answer, writes questions/<slug>.md with sources cited as [[wikilinks]].", "labels": ["feat", "v0.4"]},
+    {"title": "Retrieval layer (BM25)", "body": "src/retrieval/bm25.ts. In-process; index lives next to the ledger. Rebuild on `sync`/`ingest`.", "labels": ["feat", "v0.4"]},
+    {"title": "Citation enforcement", "body": "Refuse to write a questions/ page that contains uncited claims; either expand the prompt or lower the answer's confidence and mark sections as <!-- unverified -->.", "labels": ["feat", "v0.4"]},
+    {"title": "MCP query tool", "body": "Same shape as the CLI; streams the answer over MCP.", "labels": ["feat", "v0.4"]},
+    {"title": "questions/Index.md auto-update", "body": "Keep the index of asked questions current; reference back to log.md.", "labels": ["feat", "v0.4"]},
+    {"title": "Per-question re-asking", "body": "If a question already exists, re-running the query updates the same page (with a new 'asked again' timestamp) instead of duplicating.", "labels": ["feat", "v0.4"]},
+    {"title": "v0.4 release notes + tag", "body": "Cut release/v0.4 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.4"]},
+]
+
+V05_ISSUES: list[dict] = [
+    {"title": "watch mode", "body": "Filesystem events, debounced, runs `sync` (and optionally `ingest`) automatically. Off by default. Cross-platform via chokidar or Bun's native watch.", "labels": ["feat", "v0.5"]},
+    {"title": "Parallel extraction", "body": "Promise.all with a concurrency cap. Benchmark target: ~10× speedup on a 200-file corpus.", "labels": ["feat", "v0.5"]},
+    {"title": "Ledger query tuning", "body": "EXPLAIN-driven index review. Should be irrelevant under 10k sources, but the v0.4 query path makes it worth checking.", "labels": ["chore", "v0.5"]},
+    {"title": "Provider abstraction: llama.cpp", "body": "Adapter implementing the same interface as ollama.ts, talks to llama-server's OpenAI-compatible endpoint. Pick at config time.", "labels": ["feat", "v0.5"]},
+    {"title": "Embedding-based retrieval (optional)", "body": "Local embeddings via Ollama's /api/embeddings. Hybrid BM25+vector. Behind a config flag.", "labels": ["feat", "v0.5"]},
+    {"title": "Cookbook docs", "body": "A docs/cookbook/ directory: 'ingesting OneDrive', 'ingesting GitHub issues', 'two-machine setup with Obsidian Sync'.", "labels": ["docs", "v0.5"]},
+    {"title": "Performance benchmarks in CI", "body": "Track ingest time per file and total `sync` time across releases. Fail if a regression > 30% lands.", "labels": ["chore", "v0.5"]},
+    {"title": "v1.0 readiness checklist", "body": "Audit threats in SECURITY.md against the implemented surface. Triage .unresolved-allowed.txt accumulation. Document upgrade path.", "labels": ["chore", "security", "v0.5"]},
+    {"title": "MCP client compatibility", "body": "Verify the stdio MCP server works with Copilot, Codex CLI, Cursor, and Claude Desktop. Provide per-client config snippets (mcp.json / settings.json). Confirm tool descriptions are clear enough for agents to use without hand-holding. Smoke-test each client against the live server.", "labels": ["feat", "docs", "v0.5"]},
+    {"title": "v0.5 release notes + tag", "body": "Cut release/v0.5 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.5"]},
+]
+
+
+ISSUE_SETS: dict[str, tuple[str, list[dict]]] = {
+    "v0.1": ("v0.1 — Foundation & Safety", V01_ISSUES),
+    "v0.2": ("v0.2 — LLM Ingest (Ollama)", V02_ISSUES),
+    "v0.3": ("v0.3 — Synthesis", V03_ISSUES),
+    "v0.4": ("v0.4 — Query", V04_ISSUES),
+    "v0.5": ("v0.5 — Polish", V05_ISSUES),
+}
+
 
 def gh(args: list[str], *, body: str | None = None) -> tuple[int, str]:
-    res = subprocess.run(["gh", *args], input=body, text=True, capture_output=True)
+    # Force UTF-8 for both stdin (POST bodies) and stdout. Without this, Python on
+    # Windows uses cp1252 for the gh subprocess, which mojibakes em-dashes in
+    # milestone/issue titles before they reach the GitHub API.
+    res = subprocess.run(
+        ["gh", *args],
+        input=body,
+        capture_output=True,
+        encoding="utf-8",
+    )
     return res.returncode, res.stdout + res.stderr
 
 
@@ -63,10 +135,21 @@ def existing_milestones(repo: str) -> dict[str, int]:
 
 
 def existing_issue_titles(repo: str) -> set[str]:
-    rc, out = gh(["api", f"/repos/{repo}/issues?state=all&per_page=100"])
-    if rc != 0:
-        sys.exit(f"failed to list issues: {out}")
-    return {i["title"] for i in json.loads(out)}
+    """Return all issue titles across pages. /issues includes PRs but that's fine for dedup."""
+    titles: set[str] = set()
+    page = 1
+    while True:
+        rc, out = gh(["api", f"/repos/{repo}/issues?state=all&per_page=100&page={page}"])
+        if rc != 0:
+            sys.exit(f"failed to list issues: {out}")
+        batch = json.loads(out)
+        if not batch:
+            break
+        titles.update(i["title"] for i in batch)
+        if len(batch) < 100:
+            break
+        page += 1
+    return titles
 
 
 def ensure_milestone(repo: str, title: str, description: str, existing: dict[str, int]) -> int:
@@ -103,20 +186,34 @@ def ensure_issue(repo: str, milestone: int, issue: dict, existing: set[str]) -> 
     print(f"[issue] created: {title}")
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("repo", help="GitHub repo in owner/name form, e.g. bminier/llm-wiki-gen")
+    parser.add_argument(
+        "--milestone",
+        choices=[*ISSUE_SETS.keys(), "all"],
+        default="all",
+        help="Which milestone's issues to seed (default: all). Milestones themselves are always ensured.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: new-issues.py <owner/repo>", file=sys.stderr)
-        return 2
-    repo = sys.argv[1]
+    args = parse_args()
+    repo = args.repo
 
     milestones = existing_milestones(repo)
     for m in MILESTONES:
         milestones[m["title"]] = ensure_milestone(repo, m["title"], m["description"], milestones)
 
+    selected = list(ISSUE_SETS.keys()) if args.milestone == "all" else [args.milestone]
     issues = existing_issue_titles(repo)
-    v01 = milestones["v0.1 — Foundation & Safety"]
-    for i in V01_ISSUES:
-        ensure_issue(repo, v01, i, issues)
+    for key in selected:
+        milestone_title, issue_list = ISSUE_SETS[key]
+        milestone_num = milestones[milestone_title]
+        print(f"\n=== seeding {key} ({len(issue_list)} issues) ===")
+        for i in issue_list:
+            ensure_issue(repo, milestone_num, i, issues)
     return 0
 
 

@@ -154,7 +154,8 @@ contributor to be productive.
 | 6 | **Cookbook docs** | A `docs/cookbook/` directory: "ingesting OneDrive", "ingesting GitHub issues", "two-machine setup with Obsidian Sync". |
 | 7 | **Performance benchmarks in CI** | Track ingest time per file and total `sync` time across releases. Fail if a regression > 30% lands. |
 | 8 | **v1.0 readiness checklist** | Audit threats in SECURITY.md against the implemented surface. Triage `.unresolved-allowed.txt` accumulation. Document upgrade path. |
-| 9 | **v0.5 release notes + tag** | |
+| 9 | **MCP client compatibility** | Verify the stdio MCP server works with Copilot, Codex CLI, Cursor, and Claude Desktop. Provide per-client config snippets (`mcp.json` / `settings.json`). Confirm tool descriptions are clear enough for agents to use without hand-holding. Smoke-test each client against the live server. |
+| 10 | **v0.5 release notes + tag** | |
 
 ---
 
