@@ -1,11 +1,9 @@
 # CLAUDE.md — llm-wiki-gen
 
-Notes for Claude Code (and other agents) working in this repo.
-
-> **Resume here if context is fresh.** Read [docs/roadmap.md](docs/roadmap.md)
-> first — it has the where-we-are snapshot, the open PRs/decisions, and the
-> v0.2–v0.5 issue drafts. This file covers conventions; the roadmap covers
-> state.
+Notes for Claude Code (and other agents) working in this repo. Open milestones
+and active scope live in [GitHub Issues](https://github.com/bminier/llm-wiki-gen/milestones)
+and [CHANGELOG.md](CHANGELOG.md); this file covers conventions and durable
+design decisions.
 
 ## Branch model
 
@@ -25,6 +23,11 @@ Notes for Claude Code (and other agents) working in this repo.
 - Tests: **`bun:test`**. Co-locate fixture data under `tests/fixtures/`.
 - Commit style: **Conventional Commits** (`feat:`, `fix:`, `chore:`,
   `docs:`, `test:`, `refactor:`).
+- **LLM is local-only.** `[llm].provider` accepts `"ollama"` or `"none"`.
+  Adding a remote-API provider requires opt-in plus confirmation — see
+  [SECURITY.md](SECURITY.md).
+- **MCP transport is stdio only.** No HTTP/SSE in v0.1. Only reconsider if a
+  concrete remote-client use case appears.
 
 ## What goes where
 
@@ -83,10 +86,25 @@ A failed hook means a real issue — investigate, don't bypass with `--no-verify
   changing semantics. Keep that pattern when extending the schema.
 - The hash for `tests/fixtures/pii-samples/synthetic.txt` is **deliberately
   hot** — it contains DENY-tier strings. Pre-commit allowlist excludes
-  `tests/fixtures/pii-samples/.*` from gitleaks.
+  `tests/fixtures/pii-samples/.*` from gitleaks. The same allowlist (kept
+  in sync) covers the `pii-deny-scan` hook in `.pre-commit-config.yaml`.
 - Glob-matching in `src/core/walker.ts` is a tiny bespoke implementation
   (`globMatches`). It supports `*`, `**`, and `?`. If a real glob need shows
   up, swap in `picomatch`; don't grow the bespoke version further.
+- **Two-pass reconciler is non-negotiable.** Single-pass would lose rename
+  detection. The seven status transitions
+  (`new | unchanged | changed | moved | duplicate | deleted | quarantined`)
+  are tested explicitly in `tests/unit/reconciler.test.ts` — when extending,
+  preserve all seven.
+- **Lex-smallest path wins canonical** when two new files share the same
+  hash in one run. Arbitrary but deterministic. Don't change without
+  updating tests.
+- **PII regex log is hash-redacted.** Full PII never lives in the ledger;
+  finding entries store a hash of the matched substring, not the literal.
+- **`Index.md` pages are exempt from per-folder frontmatter schemas.**
+  Detection is "no frontmatter block at all → use the default schema." If
+  you add a folder with required frontmatter, give the folder's `Index.md`
+  an actual frontmatter block or it'll skip validation.
 
 ## When extending
 
@@ -99,3 +117,18 @@ A failed hook means a real issue — investigate, don't bypass with `--no-verify
 - **New CLI flag**: add to the relevant `defineCommand` block in
   `src/cli.ts` and propagate through to the command function. Add an MCP
   tool argument if the flag is meaningful over MCP.
+
+## Out of scope (revisit at v1.0+)
+
+Mentioned in the original Karpathy discussion but deliberately deferred —
+not currently milestoned, not currently filed as issues:
+
+- Spreadsheet (xlsx) intelligence — harder than PDF/DOCX because cell
+  semantics matter.
+- Image OCR.
+- Visio (vsdx) diagram extraction — aspirational.
+- Two-machine sync of the wiki — Obsidian Sync is one answer, a Git remote
+  is another. Cookbook material, not a feature.
+- Cross-vault federation — multiple wikis with shared topics.
+- GitHub-issue ingestion as a source type — natural extension; could land
+  alongside the LLM ingest pipeline if scope allows.

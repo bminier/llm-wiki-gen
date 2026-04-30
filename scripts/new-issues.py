@@ -7,9 +7,6 @@ Usage:
     python scripts/new-issues.py <owner/repo> --milestone all
 
 Idempotent: skips milestones/issues whose titles already exist.
-
-Issue bodies mirror the per-milestone tables in docs/roadmap.md. Update
-the roadmap first, then update the corresponding V0X_ISSUES block here.
 """
 from __future__ import annotations
 
@@ -68,7 +65,7 @@ V02_ISSUES: list[dict] = [
     {"title": "pii-llm integration tests", "body": "Use a tiny local model in CI (or skip on no-Ollama with a clear message). Cover: personal email correctly promoted, business email correctly demoted, ambiguous case stays at warn.", "labels": ["test", "security", "v0.2"]},
     {"title": "Ingest cost accounting", "body": "Per-run token count + wall time written to runs.summary_json. Surface via `status` MCP tool.", "labels": ["feat", "v0.2"]},
     {"title": "Automated tests for v0.2 ingest pipeline", "body": "Unit + integration coverage for: Ollama client (mocked + skip-if-no-Ollama live), PDF/DOCX extractors (golden bytes), source-note generator (idempotency), `ingest` end-to-end, `log.md` round-trip, MCP `ingest` tool, slug strategy, cost accounting. Excludes pii-llm (own issue).", "labels": ["test", "v0.2"]},
-    {"title": "Update docs for v0.2", "body": "README LLM-ingest section, CHANGELOG, docs/architecture.md (extractor pipeline + slug algorithm + log.md format), docs/pii-tiers.md (LLM promotion/demotion rules). Mark v0.2 done in docs/roadmap.md.", "labels": ["docs", "v0.2"]},
+    {"title": "Update docs for v0.2", "body": "README LLM-ingest section, CHANGELOG, docs/architecture.md (extractor pipeline + slug algorithm + log.md format), docs/pii-tiers.md (LLM promotion/demotion rules).", "labels": ["docs", "v0.2"]},
     {"title": "v0.2 release notes + tag", "body": "Cut release/v0.2 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.2"]},
 ]
 
@@ -81,7 +78,7 @@ V03_ISSUES: list[dict] = [
     {"title": "Synthesis test fixtures", "body": "Tiny vault + tiny source set that exercises the full ingest→synthesize loop. Used by both unit tests and the v0.3 smoke test.", "labels": ["test", "v0.3"]},
     {"title": "Query-aware lint", "body": "When `lint` finds a topic referenced by a wikilink that has no corresponding topics/<name>.md, suggest creating it (printed only, doesn't fail).", "labels": ["feat", "v0.3"]},
     {"title": "Automated tests for v0.3 synthesis", "body": "Use the synthesis fixtures to drive: topic-page agent (round-trip through <!-- agent:start/end -->), contradiction detector (golden divergence cases), index.md auto-maintenance, wikilink-graph metrics, query-aware lint suggestions.", "labels": ["test", "v0.3"]},
-    {"title": "Update docs for v0.3", "body": "README synthesis section, CHANGELOG, docs/architecture.md (topic-agent contract, section-marker convention, contradiction format). Mark v0.3 done in docs/roadmap.md.", "labels": ["docs", "v0.3"]},
+    {"title": "Update docs for v0.3", "body": "README synthesis section, CHANGELOG, docs/architecture.md (topic-agent contract, section-marker convention, contradiction format).", "labels": ["docs", "v0.3"]},
     {"title": "v0.3 release notes + tag", "body": "Cut release/v0.3 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.3"]},
 ]
 
@@ -93,7 +90,7 @@ V04_ISSUES: list[dict] = [
     {"title": "questions/Index.md auto-update", "body": "Keep the index of asked questions current; reference back to log.md.", "labels": ["feat", "v0.4"]},
     {"title": "Per-question re-asking", "body": "If a question already exists, re-running the query updates the same page (with a new 'asked again' timestamp) instead of duplicating.", "labels": ["feat", "v0.4"]},
     {"title": "Automated tests for v0.4 query", "body": "`query` CLI golden Q&A, BM25 retrieval correctness, citation enforcement (refusal cases for uncited claims), MCP `query` tool, re-asking idempotency.", "labels": ["test", "v0.4"]},
-    {"title": "Update docs for v0.4", "body": "README query workflow, CHANGELOG, docs/architecture.md (retrieval layer + citation rules). Mark v0.4 done in docs/roadmap.md.", "labels": ["docs", "v0.4"]},
+    {"title": "Update docs for v0.4", "body": "README query workflow, CHANGELOG, docs/architecture.md (retrieval layer + citation rules).", "labels": ["docs", "v0.4"]},
     {"title": "v0.4 release notes + tag", "body": "Cut release/v0.4 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.4"]},
 ]
 
@@ -108,7 +105,7 @@ V05_ISSUES: list[dict] = [
     {"title": "v1.0 readiness checklist", "body": "Audit threats in SECURITY.md against the implemented surface. Triage .unresolved-allowed.txt accumulation. Document upgrade path.", "labels": ["chore", "security", "v0.5"]},
     {"title": "MCP client compatibility", "body": "Verify the stdio MCP server works with Copilot, Codex CLI, Cursor, and Claude Desktop. Provide per-client config snippets (mcp.json / settings.json). Confirm tool descriptions are clear enough for agents to use without hand-holding. Smoke-test each client against the live server.", "labels": ["feat", "docs", "v0.5"]},
     {"title": "Automated tests for v0.5 features", "body": "watch-mode debounce, parallel-extraction concurrency cap, ledger queries under load, llama.cpp adapter parity with Ollama, embedding retrieval, MCP-client smoke tests. Excludes perf benchmarks (own issue).", "labels": ["test", "v0.5"]},
-    {"title": "Update docs for v0.5", "body": "README, CHANGELOG, docs/architecture.md (provider abstraction + watch mode + MCP client config). Mark v0.5 done in docs/roadmap.md. Cookbook is its own issue.", "labels": ["docs", "v0.5"]},
+    {"title": "Update docs for v0.5", "body": "README, CHANGELOG, docs/architecture.md (provider abstraction + watch mode + MCP client config). Cookbook is its own issue.", "labels": ["docs", "v0.5"]},
     {"title": "v0.5 release notes + tag", "body": "Cut release/v0.5 from dev, write CHANGELOG entries, tag, publish.", "labels": ["release", "v0.5"]},
 ]
 
