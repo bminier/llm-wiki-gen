@@ -1,3 +1,4 @@
+import { LlmConfigError } from "./index.ts";
 import type {
   GenerateChunk,
   GenerateRequest,
@@ -40,6 +41,31 @@ interface OllamaGenerateResponse {
   eval_count?: number;
 }
 
+/**
+ * Loopback hostnames the OllamaProvider will accept. The README/SECURITY
+ * promise is "no outbound network calls"; enforce that in code so a typo
+ * or malicious config can't quietly turn the LLM client into an exfil
+ * channel. Allowing a remote endpoint requires a code change here.
+ */
+function assertLoopbackUrl(urlStr: string): void {
+  let url: URL;
+  try {
+    url = new URL(urlStr);
+  } catch {
+    throw new LlmConfigError(`Ollama baseUrl is not a valid URL: ${urlStr}`);
+  }
+  // URL.hostname strips IPv6 brackets in some runtimes and keeps them in
+  // others. Normalize before matching.
+  const host = url.hostname.replace(/^\[/, "").replace(/]$/, "");
+  const ok =
+    host === "localhost" || host === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+  if (!ok) {
+    throw new LlmConfigError(
+      `Ollama baseUrl must be loopback (localhost, 127.0.0.0/8, ::1); got "${url.hostname}". Remote LLM endpoints require an explicit code change — see SECURITY.md.`,
+    );
+  }
+}
+
 export class OllamaProvider implements LlmProvider {
   private readonly baseUrl: string;
   private readonly defaultModel: string;
@@ -48,6 +74,7 @@ export class OllamaProvider implements LlmProvider {
   private readonly maxRetries: number;
 
   constructor(opts: OllamaOptions) {
+    assertLoopbackUrl(opts.baseUrl);
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
     this.defaultModel = opts.model;
     this.fetchFn = opts.fetch ?? fetch;
@@ -57,8 +84,9 @@ export class OllamaProvider implements LlmProvider {
 
   async health(): Promise<LlmHealth> {
     try {
-      const res = await this.requestWithRetry(`${this.baseUrl}/api/tags`, { method: "GET" });
-      const json = (await res.json()) as OllamaTagsResponse;
+      const json = await this.requestJson<OllamaTagsResponse>(`${this.baseUrl}/api/tags`, {
+        method: "GET",
+      });
       return {
         available: true,
         models: (json.models ?? []).map((m) => m.name),
@@ -69,12 +97,11 @@ export class OllamaProvider implements LlmProvider {
   }
 
   async generate(req: GenerateRequest): Promise<GenerateResponse> {
-    const res = await this.requestWithRetry(`${this.baseUrl}/api/generate`, {
+    const json = await this.requestJson<OllamaGenerateResponse>(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(this.generateBody(req, false)),
     });
-    const json = (await res.json()) as OllamaGenerateResponse;
     return {
       text: json.response ?? "",
       model: json.model,
@@ -85,7 +112,7 @@ export class OllamaProvider implements LlmProvider {
   }
 
   async *generateStream(req: GenerateRequest): AsyncIterable<GenerateChunk> {
-    const res = await this.requestWithRetry(`${this.baseUrl}/api/generate`, {
+    const res = await this.requestStream(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(this.generateBody(req, true)),
@@ -107,49 +134,87 @@ export class OllamaProvider implements LlmProvider {
   }
 
   /**
-   * Fetch with: per-attempt AbortController timeout + exponential backoff on
-   * transient failures. 4xx is not retried — those indicate a malformed request
-   * that retrying won't fix. The total deadline (`timeoutMs`) is shared across
-   * the initial attempt and all retries.
-   *
-   * Once this returns the Response, the body is the caller's responsibility
-   * (no further timeout on body read — streaming generation can take minutes).
+   * Non-streaming request: fetch + body read happen inside the same retry
+   * attempt, so the per-attempt deadline bounds *both* phases. A stalled
+   * body would otherwise hang past the configured timeoutMs.
    */
-  private async requestWithRetry(url: string, init: RequestInit): Promise<Response> {
+  private requestJson<T>(url: string, init: RequestInit): Promise<T> {
+    return this.withRetry(async (signal) => {
+      const res = await this.fetchFn(url, { ...init, signal });
+      if (!res.ok) throw await this.toResponseError(res);
+      return (await res.json()) as T;
+    }, url);
+  }
+
+  /**
+   * Streaming request: the deadline applies to the fetch initiation only
+   * (header arrival). Once the Response is in hand the abort timer is
+   * cleared — caller is on its own for body-drain time, which is
+   * intentional because generation can legitimately take minutes.
+   */
+  private requestStream(url: string, init: RequestInit): Promise<Response> {
+    return this.withRetry(async (signal) => {
+      const res = await this.fetchFn(url, { ...init, signal });
+      if (!res.ok) throw await this.toResponseError(res);
+      return res;
+    }, url);
+  }
+
+  private async toResponseError(res: Response): Promise<OllamaError> {
+    const text = await res.text().catch(() => "");
+    return new OllamaError(
+      `Ollama returned ${res.status}: ${text.trim() || res.statusText}`,
+      res.status,
+    );
+  }
+
+  /**
+   * Shared deadline + exponential backoff. The deadline (`timeoutMs`) covers
+   * the initial attempt and all retries combined; each attempt receives the
+   * remaining budget as its individual abort signal. 4xx errors are not
+   * retried — they signal a bad request, not a transient failure. Abort-like
+   * errors are rewrapped into an OllamaError that carries URL + timeout +
+   * attempt count so failures are actionable.
+   */
+  private async withRetry<T>(
+    attempt: (signal: AbortSignal) => Promise<T>,
+    url: string,
+  ): Promise<T> {
     const deadline = Date.now() + this.timeoutMs;
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let i = 0; i <= this.maxRetries; i++) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), remaining);
       try {
-        const res = await this.fetchFn(url, { ...init, signal: controller.signal });
+        const result = await attempt(controller.signal);
         clearTimeout(timer);
-        if (res.ok) return res;
-        const text = await res.text().catch(() => "");
-        const err = new OllamaError(
-          `Ollama returned ${res.status}: ${text.trim() || res.statusText}`,
-          res.status,
-        );
-        // Don't retry client errors — the request itself is bad.
-        if (res.status >= 400 && res.status < 500) throw err;
-        lastErr = err;
+        return result;
       } catch (err) {
         clearTimeout(timer);
-        // Re-throw 4xx; everything else is retryable (network errors, abort, 5xx).
+        // 4xx is terminal — don't retry, surface immediately.
         if (err instanceof OllamaError && err.status !== undefined && err.status < 500) {
           throw err;
         }
-        lastErr = err;
+        lastErr = isAbortLikeError(err)
+          ? new OllamaError(
+              `Ollama request to ${url} timed out after ${this.timeoutMs}ms (attempt ${i + 1}/${this.maxRetries + 1})`,
+            )
+          : err;
       }
-      if (attempt < this.maxRetries) {
-        const backoff = Math.min(deadline - Date.now() - 1, RETRY_BASE_MS * 2 ** attempt);
+      if (i < this.maxRetries) {
+        const backoff = Math.min(deadline - Date.now() - 1, RETRY_BASE_MS * 2 ** i);
         if (backoff > 0) await sleep(backoff);
       }
     }
-    throw lastErr instanceof Error ? lastErr : new OllamaError("Ollama request failed");
+    throw lastErr instanceof Error ? lastErr : new OllamaError(`Ollama request to ${url} failed`);
   }
+}
+
+function isAbortLikeError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return err.name === "AbortError" || err.name === "TimeoutError";
 }
 
 function nsToMs(ns: number | undefined): number {

@@ -57,15 +57,23 @@ export class LlmDisabledError extends Error {
   }
 }
 
+/** Constructor-time validation failure (bad base_url, bad config, etc.). */
+export class LlmConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LlmConfigError";
+  }
+}
+
 class NoOpProvider implements LlmProvider {
   health(): Promise<LlmHealth> {
     return Promise.resolve({ available: false, models: [], error: "provider=none" });
   }
-  generate(): Promise<GenerateResponse> {
+  generate(_req: GenerateRequest): Promise<GenerateResponse> {
     return Promise.reject(new LlmDisabledError());
   }
   // biome-ignore lint/correctness/useYield: intentionally throws before yielding.
-  async *generateStream(): AsyncIterable<GenerateChunk> {
+  async *generateStream(_req: GenerateRequest): AsyncIterable<GenerateChunk> {
     throw new LlmDisabledError();
   }
 }
@@ -92,6 +100,14 @@ export function createLlmProvider(
       });
     case "none":
       return new NoOpProvider();
+    default: {
+      // Defense-in-depth — config.provider is zod-validated against
+      // `enum(["ollama", "none"])`, so this is unreachable through the
+      // normal config path. Guard anyway in case an untyped caller
+      // bypasses zod (e.g. raw object literal in a script).
+      const exhaustive: never = config.provider;
+      throw new LlmConfigError(`Unsupported LLM provider: ${String(exhaustive)}`);
+    }
   }
 }
 

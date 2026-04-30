@@ -1,11 +1,41 @@
 import { describe, expect, test } from "bun:test";
-import { OllamaError, OllamaProvider, createLlmProvider } from "../../../src/llm/index.ts";
+import {
+  LlmConfigError,
+  OllamaError,
+  OllamaProvider,
+  createLlmProvider,
+} from "../../../src/llm/index.ts";
 
 function mockFetch(
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
 ): typeof fetch {
   return ((url: string | URL | Request, init?: RequestInit) =>
     Promise.resolve(handler(String(url), init))) as typeof fetch;
+}
+
+/**
+ * Returns a fetch that resolves with headers immediately but whose body
+ * never produces data — and errors out when the AbortSignal fires. This is
+ * the fetch-spec behavior for an aborted request mid-body-read; we simulate
+ * it so we can test that timeoutMs bounds body reads on non-streaming calls.
+ */
+function hangingBodyFetch(): typeof fetch {
+  return ((_url: string | URL | Request, init?: RequestInit) => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          controller.error(new DOMException("aborted", "AbortError"));
+          return;
+        }
+        signal?.addEventListener("abort", () => {
+          controller.error(new DOMException("aborted", "AbortError"));
+        });
+        // Never enqueue — caller hangs until abort fires.
+      },
+    });
+    return Promise.resolve(new Response(stream, { status: 200 }));
+  }) as typeof fetch;
 }
 
 function makeProvider(opts: {
@@ -21,6 +51,59 @@ function makeProvider(opts: {
     ...(opts.maxRetries !== undefined && { maxRetries: opts.maxRetries }),
   });
 }
+
+describe("OllamaProvider constructor", () => {
+  const noopFetch = mockFetch(() => new Response(JSON.stringify({ models: [] }), { status: 200 }));
+
+  test("accepts localhost", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434",
+          model: "x",
+          fetch: noopFetch,
+        }),
+    ).not.toThrow();
+  });
+
+  test("accepts 127.0.0.1 (and the wider 127.0.0.0/8 block)", () => {
+    expect(
+      () => new OllamaProvider({ baseUrl: "http://127.0.0.1:11434", model: "x", fetch: noopFetch }),
+    ).not.toThrow();
+    expect(
+      () => new OllamaProvider({ baseUrl: "http://127.5.6.7:11434", model: "x", fetch: noopFetch }),
+    ).not.toThrow();
+  });
+
+  test("accepts IPv6 ::1", () => {
+    expect(
+      () => new OllamaProvider({ baseUrl: "http://[::1]:11434", model: "x", fetch: noopFetch }),
+    ).not.toThrow();
+  });
+
+  test("rejects a remote hostname", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "https://api.openai.com",
+          model: "x",
+          fetch: noopFetch,
+        }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("rejects 0.0.0.0 (wildcard, not loopback)", () => {
+    expect(
+      () => new OllamaProvider({ baseUrl: "http://0.0.0.0:11434", model: "x", fetch: noopFetch }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("rejects malformed URL", () => {
+    expect(
+      () => new OllamaProvider({ baseUrl: "not a url", model: "x", fetch: noopFetch }),
+    ).toThrow(LlmConfigError);
+  });
+});
 
 describe("OllamaProvider.health", () => {
   test("returns model list on 200", async () => {
@@ -174,6 +257,38 @@ describe("OllamaProvider.generate", () => {
     const elapsed = Date.now() - start;
     // Deadline is 250ms; allow generous slack for CI scheduling jitter.
     expect(elapsed).toBeLessThan(2000);
+  });
+
+  test("body-read timeout aborts a hanging non-streaming response", async () => {
+    // fetch returns 200 but the body never produces — only the body-read
+    // deadline can save us. If withRetry cleared the abort timer on header
+    // arrival (the previous bug), this test would hang past timeoutMs.
+    const provider = makeProvider({
+      timeoutMs: 200,
+      maxRetries: 0,
+      fetch: hangingBodyFetch(),
+    });
+    const start = Date.now();
+    await expect(provider.generate({ prompt: "x" })).rejects.toBeInstanceOf(OllamaError);
+    expect(Date.now() - start).toBeLessThan(2000);
+  });
+
+  test("wraps aborts with URL + timeout + attempt count context", async () => {
+    const provider = makeProvider({
+      timeoutMs: 80,
+      maxRetries: 1,
+      fetch: hangingBodyFetch(),
+    });
+    try {
+      await provider.generate({ prompt: "x" });
+      throw new Error("expected provider.generate to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OllamaError);
+      const msg = (err as Error).message;
+      expect(msg).toContain("/api/generate");
+      expect(msg).toMatch(/80ms/);
+      expect(msg).toMatch(/attempt \d+\/\d+/);
+    }
   });
 });
 
