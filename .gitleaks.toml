@@ -16,6 +16,12 @@ paths = [
   '''tests/fixtures/pii-samples/.*''',
   '''tests/fixtures/sources/.*''',
   '''docs/karpathy.*\.md''',
+  '''docs/pii-tiers\.md''',
+  '''CLAUDE\.md''',
 ]
 # Pre-commit handles staged scans; CI handles full-history scans. Identical
 # config keeps both stages consistent.
+# Keep this list in sync with the pii-deny-scan exclude in
+# .pre-commit-config.yaml — the PII regex scanner has wider coverage than
+# gitleaks (it adds ABA, IBAN, BIP-39, etc.), but every path that needs to
+# be allowlisted for one is also allowlisted for the other.

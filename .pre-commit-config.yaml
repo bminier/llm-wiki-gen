@@ -50,12 +50,12 @@ repos:
         # Allowlist for files that legitimately contain DENY-tier patterns:
         # synthetic fixtures, the rule docs that describe the patterns, and
         # the conversation backup that captured them as part of the design.
-        # Mirrors the gitleaks allowlist in .gitleaks.toml.
+        # Kept in sync with the [allowlist].paths block in .gitleaks.toml.
         exclude: |
           (?x)^(
             tests/fixtures/pii-samples/.*|
             tests/fixtures/sources/.*|
-            docs/karpathy_.*\.md|
+            docs/karpathy.*\.md|
             docs/pii-tiers\.md|
             CLAUDE\.md
           )$
