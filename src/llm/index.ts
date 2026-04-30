@@ -1,4 +1,5 @@
 import type { ResolvedConfig } from "../core/config.ts";
+import { LlmConfigError, LlmDisabledError } from "./errors.ts";
 import { OllamaProvider } from "./ollama.ts";
 
 export interface LlmHealth {
@@ -50,20 +51,7 @@ export interface LlmProvider {
   generateStream(req: GenerateRequest): AsyncIterable<GenerateChunk>;
 }
 
-export class LlmDisabledError extends Error {
-  constructor() {
-    super("LLM provider is set to 'none'; refusing to call.");
-    this.name = "LlmDisabledError";
-  }
-}
-
-/** Constructor-time validation failure (bad base_url, bad config, etc.). */
-export class LlmConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LlmConfigError";
-  }
-}
+export { LlmConfigError, LlmDisabledError } from "./errors.ts";
 
 class NoOpProvider implements LlmProvider {
   health(): Promise<LlmHealth> {

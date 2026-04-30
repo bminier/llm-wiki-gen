@@ -55,7 +55,7 @@ provider requires a code change plus an explicit confirmation per
 #    - gitleaks (recommended, for ad-hoc secret scans)   https://github.com/gitleaks/gitleaks
 #
 #    Ollama setup, when you reach v0.2:
-#       curl -fsSL https://ollama.com/install.sh | sh    # or download installer
+#       Install per the official instructions:           https://ollama.com/download
 #       ollama pull llama3.1:8b                          # ~4.7 GB; one-time
 #       ollama serve                                     # listens on localhost:11434
 
