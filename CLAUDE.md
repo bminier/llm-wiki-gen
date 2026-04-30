@@ -125,10 +125,11 @@ not currently milestoned, not currently filed as issues:
 
 - Spreadsheet (xlsx) intelligence — harder than PDF/DOCX because cell
   semantics matter.
+- Slide decks (pptx) — same difficulty class as xlsx; layout / speaker-notes
+  separation matters.
 - Image OCR.
 - Visio (vsdx) diagram extraction — aspirational.
-- Two-machine sync of the wiki — Obsidian Sync is one answer, a Git remote
-  is another. Cookbook material, not a feature.
+- Two-machine sync of the wiki — Obsidian Sync is one answer; a Git remote
+  is another; the doc also suggests a local Git repo with OneDrive used
+  purely as a backup mirror. Cookbook material, not a feature.
 - Cross-vault federation — multiple wikis with shared topics.
-- GitHub-issue ingestion as a source type — natural extension; could land
-  alongside the LLM ingest pipeline if scope allows.
