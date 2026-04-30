@@ -100,7 +100,9 @@ contextual refinement. PDF and DOCX become first-class.
 | 9 | **Slug + filename strategy** | Stable, collision-free slugs from arbitrary source paths. Frontmatter must round-trip after rename. Document the algorithm in `docs/architecture.md`. |
 | 10 | **`pii-llm` integration tests** | Use a tiny local model in CI (or skip on no-Ollama with a clear message). Cover: personal email correctly promoted, business email correctly demoted, ambiguous case stays at warn. |
 | 11 | **Ingest cost accounting** | Per-run token count + wall time written to `runs.summary_json`. Surface via `status` MCP tool. |
-| 12 | **v0.2 release notes + tag** | Cut `release/v0.2` from `dev`, write CHANGELOG, tag. |
+| 12 | **Automated tests for v0.2 ingest pipeline** | Unit + integration coverage for: Ollama client (mocked + skip-if-no-Ollama live), PDF/DOCX extractors (golden bytes), source-note generator (idempotency), `ingest` end-to-end, `log.md` round-trip, MCP `ingest` tool, slug strategy, cost accounting. Excludes `pii-llm` (own issue). |
+| 13 | **Update docs for v0.2** | README LLM-ingest section, CHANGELOG, `docs/architecture.md` (extractor pipeline + slug algorithm + log.md format), `docs/pii-tiers.md` (LLM promotion/demotion rules). Mark v0.2 done in `docs/roadmap.md`. |
+| 14 | **v0.2 release notes + tag** | Cut `release/v0.2` from `dev`, write CHANGELOG, tag. |
 
 ---
 
@@ -118,7 +120,9 @@ Topic pages cut across many source-notes. Contradictions surface.
 | 5 | **Wikilink graph health** in `lint` | Add metrics: average inbound links, isolated clusters, deepest path. Print as a table in human mode; JSON in `--json` mode. |
 | 6 | **Synthesis test fixtures** | Tiny vault + tiny source set that exercises the full ingest→synthesize loop. Used by both unit tests and the v0.3 smoke test. |
 | 7 | **Query-aware lint** | When `lint` finds a topic referenced by a wikilink that has no corresponding `topics/<name>.md`, suggest creating it (printed only, doesn't fail). |
-| 8 | **v0.3 release notes + tag** | |
+| 8 | **Automated tests for v0.3 synthesis** | Use the synthesis fixtures to drive: topic-page agent (round-trip through `<!-- agent:start/end -->`), contradiction detector (golden divergence cases), `index.md` auto-maintenance, wikilink-graph metrics, query-aware lint suggestions. |
+| 9 | **Update docs for v0.3** | README synthesis section, CHANGELOG, `docs/architecture.md` (topic-agent contract, section-marker convention, contradiction format). Mark v0.3 done in `docs/roadmap.md`. |
+| 10 | **v0.3 release notes + tag** | |
 
 ---
 
@@ -135,7 +139,9 @@ filed back into the wiki under `questions/`.
 | 4 | **MCP `query` tool** | Same shape as the CLI; streams the answer. |
 | 5 | **`questions/Index.md` auto-update** | Keep the index of asked questions current; reference back to `log.md`. |
 | 6 | **Per-question re-asking** | If a question already exists, re-running the query updates the same page (with a new "asked again" timestamp) instead of duplicating. |
-| 7 | **v0.4 release notes + tag** | |
+| 7 | **Automated tests for v0.4 query** | `query` CLI golden Q&A, BM25 retrieval correctness, citation enforcement (refusal cases for uncited claims), MCP `query` tool, re-asking idempotency. |
+| 8 | **Update docs for v0.4** | README query workflow, CHANGELOG, `docs/architecture.md` (retrieval layer + citation rules). Mark v0.4 done in `docs/roadmap.md`. |
+| 9 | **v0.4 release notes + tag** | |
 
 ---
 
@@ -155,7 +161,9 @@ contributor to be productive.
 | 7 | **Performance benchmarks in CI** | Track ingest time per file and total `sync` time across releases. Fail if a regression > 30% lands. |
 | 8 | **v1.0 readiness checklist** | Audit threats in SECURITY.md against the implemented surface. Triage `.unresolved-allowed.txt` accumulation. Document upgrade path. |
 | 9 | **MCP client compatibility** | Verify the stdio MCP server works with Copilot, Codex CLI, Cursor, and Claude Desktop. Provide per-client config snippets (`mcp.json` / `settings.json`). Confirm tool descriptions are clear enough for agents to use without hand-holding. Smoke-test each client against the live server. |
-| 10 | **v0.5 release notes + tag** | |
+| 10 | **Automated tests for v0.5 features** | watch-mode debounce, parallel-extraction concurrency cap, ledger queries under load, llama.cpp adapter parity with Ollama, embedding retrieval, MCP-client smoke tests. Excludes perf benchmarks (own issue). |
+| 11 | **Update docs for v0.5** | README, CHANGELOG, `docs/architecture.md` (provider abstraction + watch mode + MCP client config). Mark v0.5 done in `docs/roadmap.md`. Cookbook is its own issue. |
+| 12 | **v0.5 release notes + tag** | |
 
 ---
 
