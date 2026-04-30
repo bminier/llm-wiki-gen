@@ -9,8 +9,17 @@ import {
 function mockFetch(
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
 ): typeof fetch {
-  return ((url: string | URL | Request, init?: RequestInit) =>
-    Promise.resolve(handler(String(url), init))) as typeof fetch;
+  // Real fetch never throws synchronously — every failure surfaces as a
+  // promise rejection. Mirror that here so handler-throws (used to fake
+  // network errors) become rejections, not sync throws that could mask
+  // real-vs-mock divergence in callers.
+  return ((url: string | URL | Request, init?: RequestInit) => {
+    try {
+      return Promise.resolve(handler(String(url), init));
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  }) as typeof fetch;
 }
 
 /**
