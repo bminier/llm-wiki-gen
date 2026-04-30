@@ -2,6 +2,11 @@
 
 Notes for Claude Code (and other agents) working in this repo.
 
+> **Resume here if context is fresh.** Read [docs/roadmap.md](docs/roadmap.md)
+> first — it has the where-we-are snapshot, the open PRs/decisions, and the
+> v0.2–v0.5 issue drafts. This file covers conventions; the roadmap covers
+> state.
+
 ## Branch model
 
 - Default working branch is **`dev`**, not `main`/`master`. There is no `main`.
