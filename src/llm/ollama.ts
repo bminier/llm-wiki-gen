@@ -237,7 +237,7 @@ export class OllamaProvider implements LlmProvider {
         // failure.
         if (isAbortLikeError(err)) {
           lastErr = new OllamaError(
-            `Ollama request to ${url} timed out after ${this.timeoutMs}ms (attempt ${i + 1}/${this.maxRetries + 1})`,
+            `Ollama request to ${url} exceeded total deadline of ${this.timeoutMs}ms (failed during attempt ${i + 1}/${this.maxRetries + 1})`,
           );
         } else if (err instanceof OllamaError && err.status !== undefined && err.status >= 500) {
           lastErr = err;
