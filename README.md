@@ -6,10 +6,13 @@ source allowlist, tiered PII scanning (DENY / WARN / ALLOW), gitleaks for
 secrets, and pre-commit hooks for everything that should never reach git.
 
 **Local-first means local-only.** The LLM provider is constrained to
-[Ollama](https://ollama.com) running on `localhost`, or `none` (off). There
-is no remote-API integration, no telemetry, and no opt-in network call
-outside `localhost:11434`. Adding a remote provider requires a code change
-plus an explicit confirmation per [SECURITY.md](SECURITY.md).
+[Ollama](https://ollama.com) running on a loopback address (default
+`localhost:11434`; `127.0.0.0/8` and `::1` also accepted), or `none` (off).
+There is no remote-API integration and no telemetry. Non-loopback URLs are
+rejected at provider construction time, so a typo or malicious config can't
+quietly turn the LLM client into an exfiltration channel. Adding a remote
+provider requires a code change plus an explicit confirmation per
+[SECURITY.md](SECURITY.md).
 
 [gist]: https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 
@@ -100,8 +103,8 @@ business_phone_allowlist = ["+1-800-555-0199"]
 # provider is restricted by zod to "ollama" or "none". A remote-API provider
 # would require a code change plus an explicit confirmation step.
 provider = "ollama"
-# base_url is intentionally local-only — anything that isn't a localhost
-# address will be flagged by SECURITY.md review before reaching main.
+# base_url is enforced loopback at provider construction: localhost,
+# 127.0.0.0/8, or ::1 only. Bare-origin only (no path/query/fragment).
 base_url = "http://localhost:11434"
 model    = "llama3.1:8b"
 ```

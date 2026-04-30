@@ -103,6 +103,52 @@ describe("OllamaProvider constructor", () => {
       () => new OllamaProvider({ baseUrl: "not a url", model: "x", fetch: noopFetch }),
     ).toThrow(LlmConfigError);
   });
+
+  test("rejects numeric-but-invalid 127.* hostnames (e.g. 127.999.0.1)", () => {
+    // The previous regex check accepted any "127.\d{1,3}.\d{1,3}.\d{1,3}",
+    // which would let "127.999.0.1" through despite not being a valid IPv4
+    // address — and could route off-loopback if some resolver accepted it.
+    expect(
+      () =>
+        new OllamaProvider({ baseUrl: "http://127.999.0.1:11434", model: "x", fetch: noopFetch }),
+    ).toThrow(LlmConfigError);
+    expect(
+      () =>
+        new OllamaProvider({ baseUrl: "http://127.0.0.300:11434", model: "x", fetch: noopFetch }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("rejects baseUrl with a path", () => {
+    // "/api/..." is appended downstream; a non-origin baseUrl would
+    // silently produce ".../foo/api/tags" instead of ".../api/tags".
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434/foo",
+          model: "x",
+          fetch: noopFetch,
+        }),
+    ).toThrow(LlmConfigError);
+  });
+
+  test("rejects baseUrl with a query or fragment", () => {
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434/?x=1",
+          model: "x",
+          fetch: noopFetch,
+        }),
+    ).toThrow(LlmConfigError);
+    expect(
+      () =>
+        new OllamaProvider({
+          baseUrl: "http://localhost:11434/#frag",
+          model: "x",
+          fetch: noopFetch,
+        }),
+    ).toThrow(LlmConfigError);
+  });
 });
 
 describe("OllamaProvider.health", () => {
@@ -214,6 +260,22 @@ describe("OllamaProvider.generate", () => {
     const r = await provider.generate({ prompt: "test" });
     expect(r.text).toBe("ok");
     expect(calls).toBe(2);
+  });
+
+  test("does not retry on JSON parse failure (non-transient)", async () => {
+    // res.json() throws SyntaxError; that's a content/protocol bug, not a
+    // transient network failure. Burning retries on it just delays the
+    // inevitable.
+    let calls = 0;
+    const provider = makeProvider({
+      maxRetries: 3,
+      fetch: mockFetch(() => {
+        calls++;
+        return new Response("definitely {{not json", { status: 200 });
+      }),
+    });
+    await expect(provider.generate({ prompt: "test" })).rejects.toThrow();
+    expect(calls).toBe(1);
   });
 
   test("does not retry 4xx", async () => {
